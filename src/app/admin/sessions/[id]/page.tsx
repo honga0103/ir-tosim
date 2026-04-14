@@ -574,7 +574,7 @@ export default function SessionDetailPage() {
                   </select>
                   <input
                     type="text"
-                    placeholder="예: 68,000,000"
+                    placeholder="예: 10,000,000"
                     className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
                     value={mf.investmentAmountValue}
                     onChange={(e) => setMf({ ...mf, investmentAmountValue: e.target.value })}
@@ -587,7 +587,7 @@ export default function SessionDetailPage() {
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">밸류에이션 <span className="text-gray-300 font-normal">(선택)</span></label>
                 <input
                   type="text"
-                  placeholder="예: $11,268,000 또는 120억원"
+                  placeholder="예: 100억원"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
                   value={mf.valuation}
                   onChange={(e) => setMf({ ...mf, valuation: e.target.value })}
