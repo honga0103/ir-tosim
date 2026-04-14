@@ -343,7 +343,7 @@ export default function AdminPage() {
                 />
                 <input
                   type="email"
-                  placeholder="이메일 (선택)"
+                  placeholder="이메일"
                   className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
                   value={newPartnerEmail}
                   onChange={(e) => setNewPartnerEmail(e.target.value)}
