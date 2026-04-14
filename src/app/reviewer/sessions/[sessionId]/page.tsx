@@ -8,7 +8,7 @@ type ReviewerData = {
   name: string;
   token: string;
   submittedAt: string | null;
-  session: { companyName: string; status: string };
+  session: { companyName: string; status: string; meetingDate: string | null };
   opinion: {
     positiveFactors: string;
     riskFactors: string;
@@ -47,8 +47,15 @@ export default function ReviewerSessionPage() {
     otherOpinions: "",
   });
 
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+  const dateStr = (() => {
+    const md = data?.session.meetingDate;
+    if (md) {
+      const [y, m, d] = md.split("-");
+      return `${y}년 ${Number(m)}월 ${Number(d)}일`;
+    }
+    const today = new Date();
+    return `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+  })();
 
   async function loadData() {
     const meRes = await fetch("/api/reviewer/me");

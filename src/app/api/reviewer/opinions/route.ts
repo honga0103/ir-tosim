@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const reviewer = await prisma.reviewer.findFirst({
     where: { partnerId: partner.id, sessionId },
-    include: { opinion: true, session: { select: { companyName: true, status: true } } },
+    include: { opinion: true, session: { select: { companyName: true, status: true, meetingDate: true } } },
   });
 
   if (!reviewer) return NextResponse.json({ error: "접근 권한이 없습니다." }, { status: 403 });
