@@ -119,6 +119,9 @@ export default function SessionDetailPage() {
   const [noticeText, setNoticeText] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // 투심 날짜 잠금
+  const [dateLocked, setDateLocked] = useState(false);
+
   // 미리보기 패널
   const [previewType, setPreviewType] = useState<"opinion" | "minutes" | null>(null);
 
@@ -146,6 +149,7 @@ export default function SessionDetailPage() {
       // 이미 저장된 의사록 정보가 있으면 잠금 상태로 시작
       const hasSavedData = !!(data.meetingDate || data.investmentMethod || data.fundName);
       setMinutesLocked(hasSavedData);
+      setDateLocked(!!data.meetingDate);
     }
     setLoading(false);
   }
@@ -295,31 +299,53 @@ export default function SessionDetailPage() {
           <div className="space-y-4">
             {/* 투심 날짜 빠른 설정 */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wide mb-3">투심 날짜</h2>
-              <div className="flex items-center gap-3">
-                <input
-                  type="date"
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
-                  value={mf.meetingDate}
-                  onChange={(e) => setMf({ ...mf, meetingDate: e.target.value })}
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await fetch(`/api/sessions/${id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json", "x-admin-password": password },
-                      body: JSON.stringify({ meetingDate: mf.meetingDate }),
-                    });
-                  }}
-                  className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold shrink-0"
-                  style={{ background: "#24AF64" }}
-                >
-                  저장
-                </button>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wide">투심 날짜</h2>
+                {dateLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setDateLocked(false)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:border-[#24AF64] hover:text-[#24AF64] transition font-medium"
+                  >
+                    ✏️ 수정
+                  </button>
+                )}
               </div>
-              {mf.meetingDate && (
-                <p className="text-xs text-gray-400 mt-1.5">→ {formatDateDisplay(mf.meetingDate)} · 투심의견서에 이 날짜로 표시됩니다</p>
+              {dateLocked ? (
+                <div className="text-sm font-medium text-gray-800">
+                  {formatDateDisplay(mf.meetingDate)}
+                  <p className="text-xs text-gray-400 mt-1">투심의견서 및 투심의사록에 이 날짜로 표시됩니다</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="date"
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
+                      value={mf.meetingDate}
+                      onChange={(e) => setMf({ ...mf, meetingDate: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await fetch(`/api/sessions/${id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json", "x-admin-password": password },
+                          body: JSON.stringify({ meetingDate: mf.meetingDate }),
+                        });
+                        setDateLocked(true);
+                      }}
+                      disabled={!mf.meetingDate}
+                      className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold shrink-0 disabled:opacity-40"
+                      style={{ background: "#24AF64" }}
+                    >
+                      저장
+                    </button>
+                  </div>
+                  {mf.meetingDate && (
+                    <p className="text-xs text-gray-400 mt-1.5">→ {formatDateDisplay(mf.meetingDate)}</p>
+                  )}
+                </>
               )}
             </div>
 

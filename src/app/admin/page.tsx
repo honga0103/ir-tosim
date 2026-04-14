@@ -193,19 +193,27 @@ export default function AdminPage() {
               <span className="text-sm text-gray-500 hidden sm:inline">투심 자동화</span>
             </div>
           </div>
-          {/* 탭: 데스크탑에서만 헤더 오른쪽에 표시 */}
-          <div className="hidden sm:flex gap-1 bg-gray-100 rounded-lg p-1">
+          <div className="hidden sm:flex items-center gap-3">
+            {/* 탭: 데스크탑에서만 헤더 오른쪽에 표시 */}
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setTab("sessions")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === "sessions" ? "bg-white shadow-sm text-black" : "text-gray-500"}`}
+              >
+                투심 건
+              </button>
+              <button
+                onClick={() => { setTab("partners"); loadPartners(); }}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === "partners" ? "bg-white shadow-sm text-black" : "text-gray-500"}`}
+              >
+                파트너 관리
+              </button>
+            </div>
             <button
-              onClick={() => setTab("sessions")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === "sessions" ? "bg-white shadow-sm text-black" : "text-gray-500"}`}
+              onClick={() => { sessionStorage.removeItem("admin_pw"); setAuthed(false); setPassword(""); }}
+              className="text-xs text-gray-400 hover:text-gray-600 transition"
             >
-              투심 건
-            </button>
-            <button
-              onClick={() => { setTab("partners"); loadPartners(); }}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === "partners" ? "bg-white shadow-sm text-black" : "text-gray-500"}`}
-            >
-              파트너 관리
+              로그아웃
             </button>
           </div>
         </div>
