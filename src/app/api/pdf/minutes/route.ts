@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         </tr>
         <tr>
           <td class="label">의 결 일 자</td>
-          <td>${session.meetingDate || ""}</td>
+          <td>${(() => { const md = session.meetingDate; if (md) { const [y, m, d] = md.split("-"); return `${y}년 ${Number(m)}월 ${Number(d)}일`; } return ""; })()}</td>
           <td class="label" style="width:60px;">일 시</td>
           <td>${session.meetingTime || ""}</td>
         </tr>

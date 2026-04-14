@@ -49,8 +49,11 @@ export async function GET(req: NextRequest) {
   const pages = submittedReviewers.map((reviewer) => {
     const opinion = reviewer.opinion!;
     const sealDataUrl = sealSvgToDataUrl(reviewer.name);
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+    const dateStr = (() => {
+      const md = session.meetingDate;
+      if (md) { const [y, m, d] = md.split("-"); return `${y}년 ${Number(m)}월 ${Number(d)}일`; }
+      const today = new Date(); return `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+    })();
 
     return `
     <div class="page">
