@@ -332,6 +332,10 @@ export default function ReviewerSessionPage() {
                   {/* 제출 버튼 */}
                   {editing && !isClosed && (
                     <div>
+                      <div className="flex items-start gap-2 bg-gray-50 rounded-xl px-4 py-3 mb-3 text-xs text-gray-500">
+                        <span className="shrink-0 mt-0.5">🔏</span>
+                        <span>제출하면 성명 옆에 <strong className="text-gray-700">전자도장이 자동으로 날인</strong>되어 의견서가 완성됩니다.</span>
+                      </div>
                       {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
                       <button
                         type="submit"
