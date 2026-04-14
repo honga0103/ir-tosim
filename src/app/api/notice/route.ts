@@ -31,10 +31,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const submittedReviewers = session.reviewers.filter((r): r is typeof r & { opinion: NonNullable<typeof r.opinion> } => r.opinion != null);
-  const yesCount = submittedReviewers.filter((r) => r.opinion.decision === "YES").length;
-  const conditionalCount = submittedReviewers.filter((r) => r.opinion.decision === "CONDITIONAL").length;
-  const noCount = submittedReviewers.filter((r) => r.opinion.decision === "NO").length;
+  const submittedReviewers = session.reviewers.filter((r) => r.opinion != null);
+  const yesCount = submittedReviewers.filter((r) => r.opinion?.decision === "YES").length;
+  const conditionalCount = submittedReviewers.filter((r) => r.opinion?.decision === "CONDITIONAL").length;
+  const noCount = submittedReviewers.filter((r) => r.opinion?.decision === "NO").length;
   const anyNo = noCount > 0;
   const result = anyNo ? "부결" : "가결";
 
