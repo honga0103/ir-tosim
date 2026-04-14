@@ -30,6 +30,25 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<"sessions" | "partners">("sessions");
 
+  // sessionStorage로 로그인 상태 유지 (뒤로가기 후에도 유지)
+  useEffect(() => {
+    const saved = sessionStorage.getItem("admin_pw");
+    if (saved) {
+      setPassword(saved);
+      fetch("/api/sessions", { headers: { "x-admin-password": saved } }).then(async (res) => {
+        if (res.ok) {
+          setAuthed(true);
+          setSessions(await res.json());
+          fetch("/api/partners", { headers: { "x-admin-password": saved } })
+            .then((r) => r.ok ? r.json() : [])
+            .then(setPartners);
+        } else {
+          sessionStorage.removeItem("admin_pw");
+        }
+      });
+    }
+  }, []);
+
   // 세션 수정
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -45,6 +64,7 @@ export default function AdminPage() {
     e.preventDefault();
     const res = await fetch("/api/sessions", { headers: { "x-admin-password": password } });
     if (res.ok) {
+      sessionStorage.setItem("admin_pw", password);
       setAuthed(true);
       setSessions(await res.json());
       loadPartners();

@@ -293,6 +293,36 @@ export default function SessionDetailPage() {
         {/* 탭 1: 제출 현황 */}
         {activeTab === "overview" && (
           <div className="space-y-4">
+            {/* 투심 날짜 빠른 설정 */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wide mb-3">투심 날짜</h2>
+              <div className="flex items-center gap-3">
+                <input
+                  type="date"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
+                  value={mf.meetingDate}
+                  onChange={(e) => setMf({ ...mf, meetingDate: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch(`/api/sessions/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json", "x-admin-password": password },
+                      body: JSON.stringify({ meetingDate: mf.meetingDate }),
+                    });
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold shrink-0"
+                  style={{ background: "#24AF64" }}
+                >
+                  저장
+                </button>
+              </div>
+              {mf.meetingDate && (
+                <p className="text-xs text-gray-400 mt-1.5">→ {formatDateDisplay(mf.meetingDate)} · 투심의견서에 이 날짜로 표시됩니다</p>
+              )}
+            </div>
+
             {/* 참여자 추가 - 체크박스 */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wide mb-4">참여자 선택</h2>
