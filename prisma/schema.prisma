@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 투심 건 (회사 1건 = Session 1개)
+model Session {
+  id                String        @id @default(uuid())
+  companyName       String
+  status            SessionStatus @default(OPEN)
+
+  // 투심의사록용 정보 (관리자가 입력)
+  meetingDate       String?
+  meetingTime       String?
+  meetingLocation   String?
+  gpName            String?
+  fundName          String?
+  investmentMethod  String?
+  investmentAmount  String?
+  valuation         String?
+  investmentSource  String?
+
+  reviewers         Reviewer[]
+  opinions          Opinion[]
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+enum SessionStatus {
+  OPEN
+  CLOSED
+  DONE
+}
+
+// 파트너/심사역 마스터 목록
+model Partner {
+  id            String          @id @default(uuid())
+  name          String
+  email         String?         @unique
+  password      String?         // bcrypt 해시
+  createdAt     DateTime        @default(now())
+  reviewers     Reviewer[]
+  tokens        ReviewerToken[]
+}
+
+// 투심위원 로그인 세션 토큰
+model ReviewerToken {
+  id        String   @id @default(uuid())
+  partnerId String
+  partner   Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  token     String   @unique @default(uuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// 투심 참여자 (세션별)
+model Reviewer {
+  id          String    @id @default(uuid())
+  sessionId   String
+  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  partnerId   String?
+  partner     Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
+  name        String
+  email       String?
+  token       String    @unique @default(uuid())
+  submittedAt DateTime?
+
+  opinion     Opinion?
+
+  createdAt   DateTime  @default(now())
+}
+
+// 투심의견서 내용
+model Opinion {
+  id                   String   @id @default(uuid())
+  sessionId            String
+  session              Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewerId           String   @unique
+  reviewer             Reviewer @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  positiveFactors      String
+  riskFactors          String
+  decision             Decision
+  valuationOpinion     String
+  appropriateValuation String?
+  otherOpinions        String?
+
+  createdAt            DateTime @default(now())
+}
+
+enum Decision {
+  YES
+  CONDITIONAL
+  NO
+}
