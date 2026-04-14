@@ -335,7 +335,7 @@ export default function AdminPage() {
               <form onSubmit={addPartner} className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
-                  placeholder="이름 (예: 김태호)"
+                  placeholder="이름"
                   required
                   className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#24AF64]"
                   value={newPartnerName}
