@@ -90,6 +90,7 @@ model Opinion {
   valuationOpinion     String
   appropriateValuation String?
   otherOpinions        String?
+  sealType             String?  // "AUTO" | "CUSTOM" | null(구버전 기본동작)
 
   createdAt            DateTime @default(now())
 }

@@ -27,7 +27,9 @@ export default async function MyOpinionPrintPage({ params }: { params: Promise<{
   if (!reviewer || !reviewer.opinion) return notFound();
 
   const opinion = reviewer.opinion;
-  const seal = reviewer.partner?.sealImage ?? sealSvgToDataUrl(reviewer.name);
+  const seal = opinion.sealType === "AUTO"
+    ? sealSvgToDataUrl(reviewer.name)
+    : (reviewer.partner?.sealImage ?? sealSvgToDataUrl(reviewer.name));
   const dateStr = (() => {
     const md = reviewer.session.meetingDate;
     if (md) { const [y, m, d] = md.split("-"); return `${y}년 ${Number(m)}월 ${Number(d)}일`; }

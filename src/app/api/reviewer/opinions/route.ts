@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const partner = await getReviewerFromCookie();
   if (!partner) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { sessionId, positiveFactors, riskFactors, decision, valuationOpinion, appropriateValuation, otherOpinions } =
+  const { sessionId, positiveFactors, riskFactors, decision, valuationOpinion, appropriateValuation, otherOpinions, sealType } =
     await req.json();
 
   const reviewer = await prisma.reviewer.findFirst({
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
   if (reviewer.session.status !== "OPEN") return NextResponse.json({ error: "제출이 마감되었습니다." }, { status: 400 });
   if (!["YES", "CONDITIONAL", "NO"].includes(decision)) return NextResponse.json({ error: "투자여부 값 오류" }, { status: 400 });
 
+  const validSealType = ["AUTO", "CUSTOM"].includes(sealType) ? sealType : null;
+
   await prisma.opinion.upsert({
     where: { reviewerId: reviewer.id },
     create: {
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
       valuationOpinion,
       appropriateValuation: appropriateValuation || null,
       otherOpinions: otherOpinions || null,
+      sealType: validSealType,
     },
     update: {
       positiveFactors, riskFactors,
@@ -55,6 +58,7 @@ export async function POST(req: NextRequest) {
       valuationOpinion,
       appropriateValuation: appropriateValuation || null,
       otherOpinions: otherOpinions || null,
+      sealType: validSealType,
     },
   });
 
