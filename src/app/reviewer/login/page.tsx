@@ -66,9 +66,9 @@ export default function ReviewerLoginPage() {
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 text-center space-y-2">
           <a href="/" className="text-xs text-gray-400 hover:text-gray-600">← 홈으로</a>
-          <a href="/reviewer/forgot-password" className="text-xs text-gray-400 hover:text-gray-600">비밀번호 찾기</a>
+          <p className="text-xs text-gray-300">비밀번호를 잊으셨나요? 관리자에게 문의해주세요.</p>
         </div>
       </div>
     </div>
