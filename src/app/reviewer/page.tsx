@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,7 +13,7 @@ type MySession = {
   session: { id: string; companyName: string; status: string; createdAt: string };
 };
 
-type Me = { id: string; name: string; email: string };
+type Me = { id: string; name: string; email: string; sealImage: string | null };
 
 const STATUS_COLOR: Record<string, string> = {
   OPEN: "bg-green-100 text-green-700",
@@ -34,6 +34,14 @@ export default function ReviewerDashboard() {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwSaving, setPwSaving] = useState(false);
+
+  // 전자도장 설정
+  const [showSealPanel, setShowSealPanel] = useState(false);
+  const [sealPreview, setSealPreview] = useState<string | null>(null); // 업로드 미리보기
+  const [sealSaving, setSealSaving] = useState(false);
+  const [sealError, setSealError] = useState("");
+  const [sealSuccess, setSealSuccess] = useState("");
+  const sealFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/reviewer/me")
@@ -74,6 +82,54 @@ export default function ReviewerDashboard() {
     setPwSaving(false);
   }
 
+  function handleSealFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setSealError("5MB 이하 이미지를 선택해주세요."); return; }
+    setSealError("");
+    const reader = new FileReader();
+    reader.onload = (ev) => setSealPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function saveSeal() {
+    if (!sealPreview) return;
+    setSealSaving(true);
+    setSealError("");
+    setSealSuccess("");
+    const res = await fetch("/api/reviewer/seal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sealImage: sealPreview }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMe((prev) => prev ? { ...prev, sealImage: sealPreview } : prev);
+      setSealPreview(null);
+      if (sealFileRef.current) sealFileRef.current.value = "";
+      setSealSuccess("도장이 저장되었습니다.");
+      setTimeout(() => setSealSuccess(""), 3000);
+    } else {
+      setSealError(data.error || "저장 실패");
+    }
+    setSealSaving(false);
+  }
+
+  async function resetSeal() {
+    setSealSaving(true);
+    setSealError("");
+    setSealSuccess("");
+    const res = await fetch("/api/reviewer/seal", { method: "DELETE" });
+    if (res.ok) {
+      setMe((prev) => prev ? { ...prev, sealImage: null } : prev);
+      setSealPreview(null);
+      if (sealFileRef.current) sealFileRef.current.value = "";
+      setSealSuccess("자동 생성 도장으로 변경되었습니다.");
+      setTimeout(() => setSealSuccess(""), 3000);
+    }
+    setSealSaving(false);
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-gray-400 text-sm">불러오는 중...</p>
@@ -95,6 +151,13 @@ export default function ReviewerDashboard() {
           </div>
           <span className="text-sm text-gray-600 sm:hidden font-medium">{me?.name}</span>
           <button
+            onClick={() => { setShowSealPanel(!showSealPanel); setSealError(""); setSealSuccess(""); setSealPreview(null); }}
+            className="text-xs px-2 sm:px-3 py-1.5 rounded-lg border border-gray-200 hover:border-[#24AF64] hover:text-[#24AF64] transition"
+          >
+            <span className="hidden sm:inline">🔏 전자도장 설정</span>
+            <span className="sm:hidden">🔏</span>
+          </button>
+          <button
             onClick={() => { setShowPwChange(!showPwChange); setPwError(""); setPwSuccess(false); }}
             className="text-xs px-2 sm:px-3 py-1.5 rounded-lg border border-gray-200 hover:border-[#24AF64] hover:text-[#24AF64] transition"
           >
@@ -104,6 +167,80 @@ export default function ReviewerDashboard() {
           <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600">로그아웃</button>
         </div>
       </header>
+
+      {/* 전자도장 설정 패널 */}
+      {showSealPanel && (
+        <div className="border-b border-gray-100 bg-white px-6 sm:px-8 py-5">
+          <div className="max-w-sm">
+            <h3 className="text-sm font-semibold mb-1">전자도장 설정</h3>
+            <p className="text-xs text-gray-400 mb-4">의견서 제출 시 성명 옆에 날인되는 도장입니다.</p>
+
+            {/* 현재 도장 미리보기 */}
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2 font-medium">현재 도장</p>
+              <div className="flex items-center gap-4">
+                {me?.sealImage ? (
+                  <>
+                    <img src={me.sealImage} alt="내 도장" className="w-16 h-16 object-contain border border-gray-100 rounded-lg p-1" />
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">직접 업로드한 도장</p>
+                      <button
+                        onClick={resetSeal}
+                        disabled={sealSaving}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:border-red-300 hover:text-red-500 transition disabled:opacity-50"
+                      >
+                        자동 생성으로 되돌리기
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 flex items-center justify-center border border-gray-100 rounded-lg bg-gray-50">
+                      <span className="text-2xl text-red-600 font-bold" style={{ fontFamily: "serif" }}>
+                        {me?.name?.slice(-1) ?? "인"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">이름으로 자동 생성됨</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* 업로드 영역 */}
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs text-gray-500 font-medium mb-2">새 도장 업로드</p>
+              <p className="text-xs text-gray-400 mb-3">PNG, JPG 투명 배경 권장 · 5MB 이하</p>
+              <input
+                ref={sealFileRef}
+                type="file"
+                accept="image/*"
+                onChange={handleSealFileChange}
+                className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-xs file:bg-white file:text-gray-600 hover:file:border-[#24AF64] hover:file:text-[#24AF64] cursor-pointer"
+              />
+
+              {sealPreview && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img src={sealPreview} alt="미리보기" className="w-16 h-16 object-contain border border-gray-100 rounded-lg p-1" />
+                  <div>
+                    <p className="text-xs text-gray-400 mb-2">미리보기</p>
+                    <button
+                      onClick={saveSeal}
+                      disabled={sealSaving}
+                      className="text-xs px-4 py-1.5 rounded-lg text-white font-semibold disabled:opacity-50"
+                      style={{ background: "#24AF64" }}
+                    >
+                      {sealSaving ? "저장 중..." : "이 도장으로 저장"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {sealError && <p className="text-red-500 text-xs mt-2">{sealError}</p>}
+              {sealSuccess && <p className="text-xs font-medium mt-2" style={{ color: "#24AF64" }}>✓ {sealSuccess}</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 비밀번호 변경 패널 */}
       {showPwChange && (

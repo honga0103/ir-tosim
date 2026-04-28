@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 type ReviewerData = {
@@ -37,6 +37,9 @@ export default function ReviewerSessionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
     positiveFactors: "",
@@ -46,6 +49,8 @@ export default function ReviewerSessionPage() {
     appropriateValuation: "",
     otherOpinions: "",
   });
+
+  const draftKey = `ir-draft-${sessionId}`;
 
   const dateStr = (() => {
     const md = data?.session.meetingDate;
@@ -74,12 +79,36 @@ export default function ReviewerSessionPage() {
         otherOpinions: d.opinion.otherOpinions || "",
       });
     } else {
+      // 제출 이력 없으면 임시저장 복원 시도
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setForm(parsed);
+          setDraftRestored(true);
+        } catch {
+          // 손상된 draft 무시
+        }
+      }
       setEditing(true);
     }
     setLoading(false);
   }
 
   useEffect(() => { loadData(); }, [sessionId]);
+
+  // 폼 변경 시 자동 임시저장 (1초 디바운스)
+  useEffect(() => {
+    if (!editing) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      localStorage.setItem(draftKey, JSON.stringify(form));
+      setDraftSavedAt(new Date());
+    }, 1000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [form, editing]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +121,9 @@ export default function ReviewerSessionPage() {
     });
     const result = await res.json();
     if (res.ok) {
+      localStorage.removeItem(draftKey);
+      setDraftSavedAt(null);
+      setDraftRestored(false);
       await loadData();
       setEditing(false);
       alert("제출을 완료했습니다.\n수정을 원하시면 다시 제출해주세요.");
@@ -169,8 +201,27 @@ export default function ReviewerSessionPage() {
               )}
               {opinion && editing && (
                 <div className="flex items-center justify-between px-4 sm:px-8 pt-5 pb-0">
-                  <span className="text-xs text-gray-400">의견서 수정 중</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">의견서 수정 중</span>
+                    {draftSavedAt && (
+                      <span className="text-xs text-gray-300">
+                        · 임시저장됨 {draftSavedAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </div>
                   <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+                </div>
+              )}
+              {!opinion && editing && draftRestored && (
+                <div className="flex items-center gap-2 px-4 sm:px-8 pt-5 pb-0">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-600 font-medium">임시저장된 내용을 불러왔습니다</span>
+                </div>
+              )}
+              {!opinion && editing && !draftRestored && draftSavedAt && (
+                <div className="flex items-center gap-2 px-4 sm:px-8 pt-5 pb-0">
+                  <span className="text-xs text-gray-300">
+                    임시저장됨 {draftSavedAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </div>
               )}
 

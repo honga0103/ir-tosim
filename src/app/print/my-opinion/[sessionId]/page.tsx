@@ -21,13 +21,13 @@ export default async function MyOpinionPrintPage({ params }: { params: Promise<{
 
   const reviewer = await prisma.reviewer.findFirst({
     where: { partnerId: tokenRecord.partner.id, sessionId },
-    include: { opinion: true, session: true },
+    include: { opinion: true, session: true, partner: true },
   });
 
   if (!reviewer || !reviewer.opinion) return notFound();
 
   const opinion = reviewer.opinion;
-  const seal = sealSvgToDataUrl(reviewer.name);
+  const seal = reviewer.partner?.sealImage ?? sealSvgToDataUrl(reviewer.name);
   const dateStr = (() => {
     const md = reviewer.session.meetingDate;
     if (md) { const [y, m, d] = md.split("-"); return `${y}년 ${Number(m)}월 ${Number(d)}일`; }
