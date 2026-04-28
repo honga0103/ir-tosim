@@ -19,10 +19,10 @@ export default function ForgotPasswordPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
+    const data = await res.json();
     if (res.ok) {
       setSent(true);
     } else {
-      const data = await res.json();
       setError(data.error || "오류가 발생했습니다.");
     }
     setLoading(false);
