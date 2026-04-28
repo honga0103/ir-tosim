@@ -1,0 +1,390 @@
+================================================================================
+  DHP 투심 자동화 시스템 — 개발 가이드 문서
+  작성일: 2026-04-28
+  배포 URL: https://dhp-ir-committee.vercel.app
+  GitHub: https://github.com/honga0103/ir-tosim
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+1. 프로그램 개요
+────────────────────────────────────────────────────────────────────────────────
+
+Digital Healthcare Partners(DHP)의 투자심의위원회 의견서 수집 및 의사록 생성을
+자동화한 내부 웹 애플리케이션이다.
+
+기존에 수작업으로 수집하던 투심의견서(PDF)를 웹 폼으로 대체하고,
+수집된 의견을 기반으로 투심의사록까지 자동 생성한다.
+
+사용자는 크게 두 역할로 구분된다.
+  - 관리자 (Admin): 투심 건 생성, 심사역 배정, 문서 출력
+  - 심사역 (Reviewer): 의견서 작성 및 제출
+
+
+────────────────────────────────────────────────────────────────────────────────
+2. 기술 스택
+────────────────────────────────────────────────────────────────────────────────
+
+  프레임워크    Next.js 16 (App Router, TypeScript)
+  스타일링      Tailwind CSS
+  데이터베이스  PostgreSQL (Supabase 호스팅)
+  ORM           Prisma 7
+  배포          Vercel (GitHub 연동 자동 배포)
+  인증          쿠키 기반 토큰 (심사역) / 환경변수 비밀번호 (관리자)
+
+
+────────────────────────────────────────────────────────────────────────────────
+3. 프로젝트 디렉토리 구조
+────────────────────────────────────────────────────────────────────────────────
+
+ir-tosim/
+├── prisma/
+│   └── schema.prisma          데이터베이스 스키마 정의
+│
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                    홈 (관리자/심사역 진입 분기)
+│   │   ├── layout.tsx                  공통 레이아웃
+│   │   ├── globals.css
+│   │   │
+│   │   ├── admin/
+│   │   │   ├── page.tsx                관리자 대시보드 (투심 건 목록 + 파트너 관리)
+│   │   │   └── sessions/[id]/page.tsx  투심 건 상세 (심사역 배정, 의견 확인, 문서 출력)
+│   │   │
+│   │   ├── reviewer/
+│   │   │   ├── login/page.tsx          심사역 로그인
+│   │   │   ├── page.tsx                심사역 대시보드 (투심 건 목록, 도장 설정)
+│   │   │   └── sessions/[sessionId]/page.tsx  투심의견서 작성 페이지
+│   │   │
+│   │   ├── print/
+│   │   │   ├── my-opinion/[sessionId]/page.tsx   개인 의견서 출력 (심사역용)
+│   │   │   ├── opinion/[sessionId]/page.tsx       전체 의견서 출력 (관리자용)
+│   │   │   └── minutes/[sessionId]/page.tsx       투심의사록 출력 (관리자용)
+│   │   │
+│   │   └── api/
+│   │       ├── sessions/
+│   │       │   ├── route.ts            GET(목록), POST(생성) — 관리자 전용
+│   │       │   └── [id]/route.ts       GET, PATCH(수정), DELETE — 관리자 전용
+│   │       │
+│   │       ├── partners/
+│   │       │   ├── route.ts            GET(목록), POST(추가) — 관리자 전용
+│   │       │   └── [id]/route.ts       PATCH(비밀번호), DELETE — 관리자 전용
+│   │       │
+│   │       ├── reviewers/
+│   │       │   ├── route.ts            GET(세션별 목록), POST(배정) — 관리자 전용
+│   │       │   └── [id]/route.ts       DELETE(삭제) — 관리자 전용
+│   │       │
+│   │       ├── reviewer/               (심사역 본인 전용 API, 쿠키 인증)
+│   │       │   ├── login/route.ts      로그인 → 쿠키 발급
+│   │       │   ├── logout/route.ts     로그아웃 → 쿠키 삭제
+│   │       │   ├── me/route.ts         본인 정보 조회 (name, email, sealImage)
+│   │       │   ├── sessions/route.ts   내 투심 건 목록
+│   │       │   ├── opinions/route.ts   GET(의견 조회), POST(의견 제출/수정)
+│   │       │   ├── seal/route.ts       GET/POST/DELETE 전자도장 관리
+│   │       │   └── change-password/route.ts  비밀번호 변경
+│   │       │
+│   │       ├── pdf/
+│   │       │   ├── opinion/route.ts    전체 의견서 PDF 생성 (관리자)
+│   │       │   └── minutes/route.ts    의사록 PDF 생성 (관리자)
+│   │       │
+│   │       └── notice/route.ts         공지사항 조회
+│   │
+│   └── lib/
+│       ├── prisma.ts           Prisma 클라이언트 싱글턴
+│       ├── reviewer-auth.ts    쿠키 → Partner 변환 헬퍼
+│       └── seal.ts             이름 기반 전자도장 SVG 자동 생성
+│
+├── public/
+│   ├── logo-horizontal.png
+│   └── logo-vertical.png
+│
+├── vercel.json
+├── next.config.ts
+├── prisma.config.ts
+└── package.json
+
+
+────────────────────────────────────────────────────────────────────────────────
+4. 데이터베이스 모델 (prisma/schema.prisma)
+────────────────────────────────────────────────────────────────────────────────
+
+[Session]  투심 1건 = 피투자 회사 1개
+  - id, companyName, status (OPEN/CLOSED/DONE)
+  - meetingDate, meetingTime, meetingLocation   → 의사록용
+  - gpName, fundName, investmentMethod          → 의사록용
+  - investmentAmount, valuation, investmentSource
+
+[Partner]  심사역 마스터 (회사 전체 파트너 목록)
+  - id, name, email
+  - password (bcrypt 해시)
+  - sealImage (커스텀 전자도장 base64 Data URL, nullable)
+
+[ReviewerToken]  심사역 로그인 세션 토큰
+  - partnerId → Partner
+  - token (UUID), expiresAt
+
+[Reviewer]  투심 참여자 (Session × Partner 연결)
+  - sessionId → Session
+  - partnerId → Partner (nullable: 파트너 외 외부인 가능)
+  - name, email, token (개별 접근용 UUID)
+  - submittedAt (제출 시각)
+
+[Opinion]  투심의견서 내용
+  - reviewerId → Reviewer (1:1)
+  - positiveFactors, riskFactors      평가 의견
+  - decision  (YES / CONDITIONAL / NO)
+  - valuationOpinion, appropriateValuation
+  - otherOpinions
+  - sealType  (AUTO / CUSTOM / null)   어떤 도장을 사용할지
+
+관계 요약:
+  Session  1 ── N  Reviewer  1 ── 1  Opinion
+  Partner  1 ── N  Reviewer
+  Partner  1 ── N  ReviewerToken
+
+
+────────────────────────────────────────────────────────────────────────────────
+5. 인증 구조
+────────────────────────────────────────────────────────────────────────────────
+
+[관리자]
+  - 환경변수 ADMIN_PASSWORD 와 비교
+  - API 요청 헤더 x-admin-password 로 전달
+  - 세션 상태는 sessionStorage 에 저장 (새로고침 유지, 탭 닫으면 소멸)
+  - 별도 계정 DB 없음
+
+[심사역]
+  - 이메일 + 비밀번호로 /api/reviewer/login 에 POST
+  - 성공 시 ReviewerToken 생성 → HTTP-only 쿠키(reviewer_token) 발급
+  - 이후 모든 API는 쿠키에서 토큰을 읽어 Partner 조회
+  - 토큰 만료: 30일 (reviewer-auth.ts에서 설정)
+  - 비밀번호는 bcrypt로 해싱하여 Partner.password 저장
+
+
+────────────────────────────────────────────────────────────────────────────────
+6. 주요 기능 상세
+────────────────────────────────────────────────────────────────────────────────
+
+[관리자 — /admin]
+
+  투심 건 관리
+  - 회사명 입력으로 Session 생성
+  - 상태 변경: OPEN(수집 중) → CLOSED(마감) → DONE(완료)
+  - 회사명 수정, 삭제 (의견서 포함 cascade 삭제)
+
+  파트너 관리
+  - 파트너(심사역) 추가/삭제
+  - 파트너별 비밀번호 설정/변경
+
+  투심 건 상세 (/admin/sessions/[id])
+  - 심사역 배정: 등록된 파트너 중 선택 또는 외부인 직접 추가
+  - 미배정 파트너 삭제 가능 (제출 후 삭제 불가)
+  - 투심 세부 정보 입력: 날짜, 시간, 장소, 펀드명, 투자 조건 등
+  - 전체 의견 현황 확인 (카드 형태)
+  - 문서 출력 버튼: 전체 의견서 / 투심의사록
+
+  문서 출력 (print/)
+  - /print/opinion/[sessionId]  : 전 심사역 의견서 한 번에 출력 (관리자 전용, ?pw= 쿼리 인증)
+  - /print/minutes/[sessionId]  : 투심의사록 출력 (관리자 전용, ?pw= 쿼리 인증)
+  - /print/my-opinion/[sessionId] : 개인 의견서 (심사역 전용, 쿠키 인증)
+
+──
+
+[심사역 — /reviewer]
+
+  로그인 (/reviewer/login)
+  - 이메일 + 비밀번호 입력
+  - 로그인 상태 30일 유지
+
+  대시보드 (/reviewer)
+  - 배정된 투심 건 목록
+  - 미제출 건 수 알림 배너
+  - 전자도장 설정 패널 (🔏 버튼)
+  - 비밀번호 변경 패널 (🔑 버튼)
+
+  전자도장 설정
+  - "파일 업로드": PNG/JPG 이미지 업로드 → Partner.sealImage 저장
+  - "직접 그리기": Canvas 그림판에서 마우스/터치로 서명 → 저장
+  - 등록된 도장은 DB에 영구 저장, 로그인마다 자동 불러옴
+  - "자동 생성으로 되돌리기" 버튼으로 삭제 가능
+
+  의견서 작성 (/reviewer/sessions/[sessionId])
+  - A4 문서 형태의 폼 UI
+  - 미리보기 패널 (데스크탑: 우측 분할 / 모바일: 새 탭)
+  - 작성 항목:
+      1. 평가 의견 (1.1 긍정적 요인 / 1.2 리스크 요인)
+      2. 투자 여부 (O / 조건부 O / X)
+      3. 밸류에이션 (의견 / 적정 밸류에이션)
+      4. 기타 의견
+  - 임시저장:
+      · 입력할 때마다 1초 후 localStorage에 자동 저장
+      · "임시저장" 수동 버튼으로 즉시 저장
+      · 페이지 재방문 시 자동 복원 (제출 이력 없는 경우)
+      · 제출 완료 시 임시저장 데이터 자동 삭제
+  - 전자도장 선택 (제출 전 필수 선택):
+      · 자동 생성 도장: 이름 기반 SVG 도장
+      · 등록된 도장: 대시보드에서 업로드/그린 도장 (등록 시에만 표시)
+      · 직접 그리기: 인라인 Canvas, 제출 시 등록 도장으로 자동 저장
+  - 제출 완료 후 수정 재제출 가능 (Session OPEN 상태인 동안)
+
+
+────────────────────────────────────────────────────────────────────────────────
+7. 전자도장 동작 원리
+────────────────────────────────────────────────────────────────────────────────
+
+[자동 생성]  src/lib/seal.ts
+  - 이름 글자 수에 따라 SVG 도장 자동 생성
+    · 2~3자: 세로 배열
+    · 4자: 2×2 그리드
+  - 원형 이중 테두리 + 빨간색 (#CC0000) 명조체 글자
+  - Buffer.from(svg).toString("base64") → data:image/svg+xml;base64 형태 반환
+
+[커스텀 도장]  /api/reviewer/seal
+  - POST: base64 Data URL 수신 → Partner.sealImage 컬럼에 저장
+  - GET: 현재 저장된 sealImage 반환
+  - DELETE: sealImage = null (자동생성으로 복귀)
+  - 파일 크기 제한: 5MB
+
+[프린트 페이지 도장 결정 로직]
+  opinion.sealType === "AUTO"   → sealSvgToDataUrl(이름) 사용
+  opinion.sealType === "CUSTOM" → partner.sealImage 사용
+                                  (없으면 자동생성으로 폴백)
+  opinion.sealType === null     → 구버전 기본동작 (CUSTOM과 동일)
+
+
+────────────────────────────────────────────────────────────────────────────────
+8. 환경 변수
+────────────────────────────────────────────────────────────────────────────────
+
+  DATABASE_URL      PostgreSQL 연결 문자열 (Supabase)
+  ADMIN_PASSWORD    관리자 비밀번호 (평문, 환경변수로만 관리)
+
+  위 두 변수는 Vercel 프로젝트 설정 > Environment Variables 에서 관리.
+  로컬 개발 시 .env 파일에 설정.
+
+
+────────────────────────────────────────────────────────────────────────────────
+9. 배포 프로세스
+────────────────────────────────────────────────────────────────────────────────
+
+  1. 로컬에서 코드 수정
+  2. DB 스키마 변경이 있는 경우:
+       npx prisma db push       (개발/단순 컬럼 추가)
+  3. 빌드 확인:
+       npm run build
+  4. GitHub 푸시:
+       git push origin main
+  5. Vercel이 GitHub main 브랜치 변경을 감지해 자동 빌드 및 배포
+
+
+────────────────────────────────────────────────────────────────────────────────
+10. API 엔드포인트 목록
+────────────────────────────────────────────────────────────────────────────────
+
+  관리자 전용 (x-admin-password 헤더 필수)
+  ┌─────────────────────────────────┬────────┬──────────────────────────────┐
+  │ 경로                            │ 메서드 │ 설명                         │
+  ├─────────────────────────────────┼────────┼──────────────────────────────┤
+  │ /api/sessions                   │ GET    │ 투심 건 전체 목록             │
+  │ /api/sessions                   │ POST   │ 투심 건 생성                  │
+  │ /api/sessions/[id]              │ GET    │ 투심 건 상세 (심사역 포함)    │
+  │ /api/sessions/[id]              │ PATCH  │ 투심 건 정보 수정             │
+  │ /api/sessions/[id]              │ DELETE │ 투심 건 삭제 (cascade)        │
+  │ /api/partners                   │ GET    │ 파트너 목록                   │
+  │ /api/partners                   │ POST   │ 파트너 추가                   │
+  │ /api/partners/[id]              │ PATCH  │ 파트너 비밀번호 변경          │
+  │ /api/partners/[id]              │ DELETE │ 파트너 삭제                   │
+  │ /api/reviewers                  │ GET    │ 세션별 심사역 목록            │
+  │ /api/reviewers                  │ POST   │ 심사역 배정                   │
+  │ /api/reviewers/[id]             │ DELETE │ 심사역 배정 취소              │
+  └─────────────────────────────────┴────────┴──────────────────────────────┘
+
+  심사역 전용 (reviewer_token 쿠키 필수)
+  ┌─────────────────────────────────┬────────┬──────────────────────────────┐
+  │ 경로                            │ 메서드 │ 설명                         │
+  ├─────────────────────────────────┼────────┼──────────────────────────────┤
+  │ /api/reviewer/login             │ POST   │ 로그인 (쿠키 발급)            │
+  │ /api/reviewer/logout            │ POST   │ 로그아웃 (쿠키 삭제)          │
+  │ /api/reviewer/me                │ GET    │ 본인 정보 + sealImage         │
+  │ /api/reviewer/sessions          │ GET    │ 내 투심 건 목록               │
+  │ /api/reviewer/opinions          │ GET    │ 세션별 내 의견 조회           │
+  │ /api/reviewer/opinions          │ POST   │ 의견 제출/수정 + sealType     │
+  │ /api/reviewer/seal              │ GET    │ 커스텀 도장 조회              │
+  │ /api/reviewer/seal              │ POST   │ 커스텀 도장 저장              │
+  │ /api/reviewer/seal              │ DELETE │ 커스텀 도장 삭제              │
+  │ /api/reviewer/change-password   │ POST   │ 비밀번호 변경                 │
+  └─────────────────────────────────┴────────┴──────────────────────────────┘
+
+  출력 페이지 (쿼리 인증 또는 쿠키 인증)
+  ┌────────────────────────────────────┬─────────────────────────────────────┐
+  │ 경로                               │ 설명                                │
+  ├────────────────────────────────────┼─────────────────────────────────────┤
+  │ /print/my-opinion/[sessionId]      │ 개인 의견서 (쿠키 인증)              │
+  │ /print/opinion/[sessionId]?pw=     │ 전체 의견서 (관리자 비밀번호)        │
+  │ /print/minutes/[sessionId]?pw=     │ 투심의사록 (관리자 비밀번호)         │
+  └────────────────────────────────────┴─────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────
+11. 페이지 접근 권한 요약
+────────────────────────────────────────────────────────────────────────────────
+
+  /                           공개 (홈, 진입점)
+  /admin                      관리자 비밀번호 입력 (sessionStorage 유지)
+  /admin/sessions/[id]        관리자 (URL 쿼리에 pw 포함)
+  /reviewer/login             공개
+  /reviewer                   심사역 로그인 필요 (쿠키)
+  /reviewer/sessions/[id]     심사역 로그인 필요 (쿠키)
+  /print/my-opinion/[id]      심사역 로그인 필요 (쿠키)
+  /print/opinion/[id]         관리자 비밀번호 (URL 쿼리 ?pw=)
+  /print/minutes/[id]         관리자 비밀번호 (URL 쿼리 ?pw=)
+
+
+────────────────────────────────────────────────────────────────────────────────
+12. 로컬 개발 환경 셋업
+────────────────────────────────────────────────────────────────────────────────
+
+  # 1. 패키지 설치
+  npm install
+
+  # 2. 환경변수 설정
+  .env 파일 생성:
+    DATABASE_URL="postgresql://..."
+    ADMIN_PASSWORD="원하는_비밀번호"
+
+  # 3. DB 동기화
+  npx prisma db push
+
+  # 4. 개발 서버 실행
+  npm run dev
+  → http://localhost:3000
+
+
+────────────────────────────────────────────────────────────────────────────────
+13. 주요 개발 이력 (기능 추가 순서)
+────────────────────────────────────────────────────────────────────────────────
+
+  v1  기본 구조
+      - Session / Partner / Reviewer / Opinion 모델
+      - 관리자 투심 건 관리, 심사역 배정
+      - 심사역 의견서 작성 및 제출
+      - 개인 의견서 / 전체 의견서 / 투심의사록 출력
+
+  v2  전자도장 커스터마이징
+      - Partner.sealImage 컬럼 추가
+      - /api/reviewer/seal 엔드포인트 신설
+      - 대시보드에서 파일 업로드 또는 Canvas 그림판으로 직접 그리기
+      - 등록한 도장은 DB에 영구 저장, 자동 불러오기
+
+  v3  의견서 임시저장 + 도장 선택
+      - localStorage 기반 자동 임시저장 (1초 디바운스)
+      - 수동 "임시저장" 버튼 추가
+      - 페이지 재방문 시 임시저장 내용 자동 복원
+      - 의견서 제출 전 전자도장 선택 UI 추가
+        (자동 생성 / 등록된 도장 / 직접 그리기)
+      - Opinion.sealType 컬럼 추가 (AUTO / CUSTOM)
+
+
+================================================================================
+  END OF DOCUMENT
+================================================================================

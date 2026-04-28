@@ -3,6 +3,8 @@ import { sealSvgToDataUrl } from "@/lib/seal";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/app/print/PrintButton";
 
+export const dynamic = "force-dynamic";
+
 const DECISION_LABEL: Record<string, string> = {
   YES: "O",
   CONDITIONAL: "조건부 O",
@@ -25,7 +27,7 @@ export default async function PrintOpinionPage({
     where: { id: sessionId },
     include: {
       reviewers: {
-        include: { opinion: true },
+        include: { opinion: true, partner: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -79,7 +81,9 @@ export default async function PrintOpinionPage({
         <div className="print-wrap">
           {submitted.map((reviewer) => {
             const opinion = reviewer.opinion!;
-            const seal = sealSvgToDataUrl(reviewer.name);
+            const seal = opinion.sealType === "AUTO"
+              ? sealSvgToDataUrl(reviewer.name)
+              : (reviewer.partner?.sealImage ?? sealSvgToDataUrl(reviewer.name));
             const dateStr = (() => {
               const md = session.meetingDate;
               if (md) { const [y, m, d] = md.split("-"); return `${y}년 ${Number(m)}월 ${Number(d)}일`; }

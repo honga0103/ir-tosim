@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/app/print/PrintButton";
 
+export const dynamic = "force-dynamic";
+
 const DECISION_LABEL: Record<string, string> = {
   YES: "찬성",
   CONDITIONAL: "조건부 찬성",

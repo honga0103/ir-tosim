@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/app/print/PrintButton";
 import { COOKIE_NAME } from "@/lib/reviewer-auth";
 
+export const dynamic = "force-dynamic";
+
 const DECISION_LABEL: Record<string, string> = { YES: "O", CONDITIONAL: "조건부 O", NO: "X" };
 
 export default async function MyOpinionPrintPage({ params }: { params: Promise<{ sessionId: string }> }) {
